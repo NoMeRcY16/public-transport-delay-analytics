@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GPS Test</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 16px; }
+    button { font-size: 18px; padding: 12px 20px; margin: 6px 0; }
+    pre { background: #f2f2f2; padding: 12px; font-size: 15px; }
+  </style>
+</head>
+<body>
+  <h2>GPS Test</h2>
+  <p>Secure page? <b id="secure"></b></p>
+  <button onclick="startWatch()">Start GPS</button><br>
+  <button onclick="stopWatch()">Stop GPS</button>
+  <pre id="out">Press Start GPS</pre>
+
+  <script>
+    document.getElementById("secure").textContent = window.isSecureContext;
+    let watchId = null;
+
+    function startWatch() {
+      if (!navigator.geolocation) {
+        document.getElementById("out").textContent = "Geolocation not supported";
+        return;
+      }
+      document.getElementById("out").textContent = "Waiting for GPS fix...";
+      watchId = navigator.geolocation.watchPosition(
+        function (pos) {
+          document.getElementById("out").textContent =
+            "latitude: " + pos.coords.latitude.toFixed(6) + "\n" +
+            "longitude: " + pos.coords.longitude.toFixed(6) + "\n" +
+            "accuracy_meters: " + Math.round(pos.coords.accuracy) + "\n" +
+            "speed_m_per_s: " + pos.coords.speed + "\n" +
+            "time: " + new Date(pos.timestamp).toLocaleTimeString();
+        },
+        function (err) {
+          document.getElementById("out").textContent =
+            "Error " + err.code + ": " + err.message;
+        },
+        { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+      );
+    }
+
+    function stopWatch() {
+      if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+      watchId = null;
+      document.getElementById("out").textContent = "Stopped";
+    }
+  </script>
+</body>
+</html>
