@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Route 01 GPS Logger</title>
+  <style>
+    body { font-family: Arial, sans-serif; padding: 14px; }
+    button { font-size: 18px; padding: 12px 16px; margin: 5px 5px 5px 0; }
+    #mark { background: #1a7f37; color: white; border: none; width: 100%; padding: 18px; font-size: 20px; }
+    select, input { font-size: 18px; padding: 8px; width: 100%; margin-bottom: 8px; }
+    pre { background: #f2f2f2; padding: 10px; font-size: 14px; }
+  </style>
+</head>
+<body>
+  <h3>Route 01 Hupari-Rankala Logger</h3>
+  <p>Secure page? <b id="secure"></b></p>
+
+  <label>Direction:</label>
+  <select id="direction">
+    <option value="Rankala_to_Hupri">Rankala to Hupri</option>
+    <option value="Hupri_to_Rankala">Hupri to Rankala</option>
+  </select>
+
+  <button onclick="startTrip()">Start trip</button>
+  <button onclick="endTrip()">End trip</button>
+  <button onclick="downloadCsv()">Download CSV</button>
+
+  <h4>Next stop to mark:</h4>
+  <select id="stop"></select>
+  <button id="mark" onclick="markStop()">Bus is AT this stop</button>
+
+  <pre id="out">Press Start trip.</pre>
+
+<script>
+  document.getElementById("secure").textContent = window.isSecureContext;
+
+  const STOPS = ["Rankala","Gangavesh","Shivaji Chowk","Bindu Chowk","Bhikshaling Mandir",
+    "Uma Talkis Chowk","Bagal Chowk","Janta Bazar Chowk","Tararani High School","Temblai Naka",
+    "Jakat Naka","Uchgaon","Highway","Maner Mala","Mudshingi","Hupri"];
+
+  const sel = document.getElementById("stop");
+  STOPS.forEach((s, i) => {
+    const o = document.createElement("option");
+    o.value = i + 1; o.textContent = (i + 1) + ". " + s;
+    sel.appendChild(o);
+  });
+
+  let watchId = null, rows = [], tripId = "", last = null, wakeLock = null;
+
+  function row(event, t, c, stopOrder, stopName) {
+    rows.push([tripId, event, new Date(t).toISOString(),
+      c ? c.latitude.toFixed(6) : "", c ? c.longitude.toFixed(6) : "",
+      c ? Math.round(c.accuracy) : "", c && c.speed !== null ? c.speed.toFixed(2) : "",
+      stopOrder || "", stopName || ""]);
+  }
+
+  async function startTrip() {
+    if (watchId !== null) return;
+    rows = [];
+    tripId = "route01_" + document.getElementById("direction").value + "_" + Date.now();
+    try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
+    watchId = navigator.geolocation.watchPosition(function (pos) {
+      last = { c: pos.coords, t: pos.timestamp };
+      if (pos.coords.accuracy <= 50) row("gps", pos.timestamp, pos.coords);
+      show();
+    }, function (err) {
+      document.getElementById("out").textContent = "Error " + err.code + ": " + err.message;
+    }, { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 });
+  }
+
+  function markStop() {
+    if (watchId === null) { alert("Start the trip first"); return; }
+    const i = parseInt(sel.value, 10);
+    row("stop_mark", Date.now(), last ? last.c : null, i, STOPS[i - 1]);
+    if (i < STOPS.length) sel.value = i + 1;
+    show();
+  }
+
+  function endTrip() {
+    if (watchId !== null) navigator.geolocation.clearWatch(watchId);
+    watchId = null;
+    if (wakeLock) { wakeLock.release(); wakeLock = null; }
+    document.getElementById("out").textContent = "Trip ended. Rows: " + rows.length + "\nTap Download CSV.";
+  }
+
+  function show() {
+    const marks = rows.filter(r => r[1] === "stop_mark").length;
+    document.getElementById("out").textContent =
+      "Recording...\nGPS points: " + (rows.length - marks) + "\nStops marked: " + marks +
+      "\naccuracy_m: " + (last ? Math.round(last.c.accuracy) : "n/a") +
+      "\nspeed_m_per_s: " + (last && last.c.speed !== null ? last.c.speed.toFixed(2) : "n/a");
+  }
+
+  function downloadCsv() {
+    if (rows.length === 0) { alert("Nothing recorded yet"); return; }
+    const head = "trip_id,event,timestamp_utc,latitude,longitude,accuracy_m,speed_m_per_s,stop_order,stop_name\n";
+    const blob = new Blob([head + rows.map(r => r.join(",")).join("\n")], { type: "text/csv" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = tripId + ".csv";
+    a.click();
+  }
+</script>
+</body>
+</html>
