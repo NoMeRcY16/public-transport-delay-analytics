@@ -62,7 +62,7 @@
     try { wakeLock = await navigator.wakeLock.request("screen"); } catch (e) {}
     watchId = navigator.geolocation.watchPosition(function (pos) {
       last = { c: pos.coords, t: pos.timestamp };
-      if (pos.coords.accuracy <= 50) row("gps", pos.timestamp, pos.coords);
+      row("gps", pos.timestamp, pos.coords);
       show();
     }, function (err) {
       document.getElementById("out").textContent = "Error " + err.code + ": " + err.message;
@@ -87,7 +87,7 @@
   function show() {
     const marks = rows.filter(r => r[1] === "stop_mark").length;
     document.getElementById("out").textContent =
-      "Recording...\nGPS points: " + (rows.length - marks) + "\nStops marked: " + marks +
+      (last && last.c.accuracy <= 30 ? "GOOD FIX - OK to mark stops" : "WAITING FOR GPS FIX - do not mark yet") + "\nGPS points: " + (rows.length - marks) + "\nStops marked: " + marks +
       "\naccuracy_m: " + (last ? Math.round(last.c.accuracy) : "n/a") +
       "\nspeed_m_per_s: " + (last && last.c.speed !== null ? last.c.speed.toFixed(2) : "n/a");
   }
@@ -104,3 +104,5 @@
 </script>
 </body>
 </html>
+
+
